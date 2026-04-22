@@ -1,5 +1,6 @@
+import os
 from typing import List
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Header, Request
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 import img2pdf
@@ -26,7 +27,23 @@ async def root():
     return {"status": "ok", "message": "Screenshot to PDF API is running"}
 
 @app.post("/convert")
-async def convert_to_pdf(files: List[UploadFile] = File(...)):
+async def convert_to_pdf(
+    request: Request,
+    files: List[UploadFile] = File(...),
+    x_rapidapi_proxy_secret: str = Header(None)
+):
+    # Security: Check for RapidAPI Proxy Secret
+    expected_secret = os.environ.get("RAPIDAPI_PROXY_SECRET")
+    
+    # We allow the specific frontend origin to bypass the RapidAPI check
+    # so your own website continues to work!
+    frontend_origin = "https://screenshot-to-pdf.vercel.app" # You can update this later
+    request_origin = request.headers.get("origin")
+    
+    if expected_secret and request_origin != frontend_origin:
+        if x_rapidapi_proxy_secret != expected_secret:
+            raise HTTPException(status_code=401, detail="Unauthorized. Please use RapidAPI to access this service.")
+
     if not files or len(files) == 0:
         raise HTTPException(status_code=400, detail="No files uploaded")
         
