@@ -93,18 +93,21 @@ async def convert_to_pdf(
         pdf_bytes = img2pdf.convert(image_bytes_list)
         
         # 2. Add Watermark and/or Encryption if requested
-        if watermark_text or password:
+        # Default watermark if none provided
+        effective_watermark = watermark_text or "Screenshot-to-pdf"
+        
+        if effective_watermark or password:
             reader = PdfReader(io.BytesIO(pdf_bytes))
             writer = PdfWriter()
             
             for page in reader.pages:
-                if watermark_text:
+                if effective_watermark:
                     # Get the actual dimensions of the current page
                     width = float(page.mediabox.width)
                     height = float(page.mediabox.height)
                     
                     # Create a watermark layer specifically for this page size
-                    watermark_packet = create_watermark_overlay(watermark_text, width, height)
+                    watermark_packet = create_watermark_overlay(effective_watermark, width, height)
                     watermark_pdf = PdfReader(watermark_packet)
                     watermark_page = watermark_pdf.pages[0]
                     
@@ -112,6 +115,7 @@ async def convert_to_pdf(
                     page.merge_page(watermark_page)
                 
                 writer.add_page(page)
+
             
             # Encrypt if password is provided
             if password:
