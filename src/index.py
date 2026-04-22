@@ -36,7 +36,6 @@ def create_watermark_overlay(text: str, width: float, height: float):
     can.setFont("Helvetica-Bold", font_size)
     
     # Use a light blue color that works on both dark and light backgrounds
-    # (0.7, 0.8, 1.0) is a nice sky blue
     can.setFillColorRGB(0.7, 0.8, 1.0, alpha=0.5) # 50% opacity
     
     # Draw the watermark diagonally at the exact center
@@ -49,6 +48,10 @@ def create_watermark_overlay(text: str, width: float, height: float):
     can.save()
     packet.seek(0)
     return packet
+
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "Screenshot to PDF API is running"}
 
 @app.post("/convert")
 async def convert_to_pdf(
@@ -136,26 +139,3 @@ async def convert_to_pdf(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
-
-            
-            # Encrypt if password is provided
-            if password:
-                writer.encrypt(password)
-            
-            # Save the modified PDF to bytes
-            output_packet = io.BytesIO()
-            writer.write(output_packet)
-            pdf_bytes = output_packet.getvalue()
-        
-        return Response(
-            content=pdf_bytes,
-            media_type="application/pdf",
-            headers={
-                "Content-Disposition": 'attachment; filename="converted.pdf"'
-            }
-        )
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
-
-
