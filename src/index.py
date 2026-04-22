@@ -1,3 +1,4 @@
+from typing import List
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,23 +26,32 @@ async def root():
     return {"status": "ok", "message": "Screenshot to PDF API is running"}
 
 @app.post("/convert")
-async def convert_to_pdf(file: UploadFile = File(...)):
-    if not file:
-        raise HTTPException(status_code=400, detail="No file uploaded")
+async def convert_to_pdf(files: List[UploadFile] = File(...)):
+    if not files or len(files) == 0:
+        raise HTTPException(status_code=400, detail="No files uploaded")
         
-    if file.content_type not in SUPPORTED_FORMATS:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Unsupported file type: {file.content_type}. Please upload PNG, JPG, JPEG, or WEBP."
-        )
+    image_bytes_list = []
+    
+    for file in files:
+        if file.content_type not in SUPPORTED_FORMATS:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Unsupported file type: {file.content_type}. Please upload PNG, JPG, JPEG, or WEBP."
+            )
+            
+        try:
+            image_bytes = await file.read()
+            if not image_bytes:
+                continue
+            image_bytes_list.append(image_bytes)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to read file {file.filename}: {str(e)}")
+
+    if not image_bytes_list:
+        raise HTTPException(status_code=400, detail="No valid images provided")
         
     try:
-        image_bytes = await file.read()
-        
-        if not image_bytes:
-            raise HTTPException(status_code=400, detail="Empty file provided")
-            
-        pdf_bytes = img2pdf.convert(image_bytes)
+        pdf_bytes = img2pdf.convert(image_bytes_list)
         
         return Response(
             content=pdf_bytes,
