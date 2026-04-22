@@ -27,14 +27,17 @@ SUPPORTED_FORMATS = {
 }
 
 def create_watermark_overlay(text: str, width: float, height: float):
-    """Creates a temporary PDF in memory with the watermark text centered to specific dimensions."""
+    """Creates a temporary PDF in memory with the watermark text centered and highly visible."""
     packet = io.BytesIO()
     can = canvas.Canvas(packet, pagesize=(width, height))
     
-    # Calculate font size relative to page width (e.g., 8% of width)
-    font_size = max(20, min(width, height) * 0.08)
-    can.setFont("Helvetica", font_size)
-    can.setFillGray(0.5, 0.3) # 50% gray, 30% alpha
+    # Large, bold font
+    font_size = max(30, min(width, height) * 0.1)
+    can.setFont("Helvetica-Bold", font_size)
+    
+    # Use a light blue color that works on both dark and light backgrounds
+    # (0.7, 0.8, 1.0) is a nice sky blue
+    can.setFillColorRGB(0.7, 0.8, 1.0, alpha=0.5) # 50% opacity
     
     # Draw the watermark diagonally at the exact center
     can.saveState()
@@ -93,7 +96,6 @@ async def convert_to_pdf(
         pdf_bytes = img2pdf.convert(image_bytes_list)
         
         # 2. Add Watermark and/or Encryption if requested
-        # Default watermark if none provided
         effective_watermark = watermark_text or "Screenshot-to-pdf"
         
         if effective_watermark or password:
@@ -102,19 +104,38 @@ async def convert_to_pdf(
             
             for page in reader.pages:
                 if effective_watermark:
-                    # Get the actual dimensions of the current page
+                    # Get dimensions
                     width = float(page.mediabox.width)
                     height = float(page.mediabox.height)
                     
-                    # Create a watermark layer specifically for this page size
+                    # Create watermark layer
                     watermark_packet = create_watermark_overlay(effective_watermark, width, height)
                     watermark_pdf = PdfReader(watermark_packet)
                     watermark_page = watermark_pdf.pages[0]
                     
-                    # Merge watermark onto the page
+                    # IMPORTANT: Merge on top
                     page.merge_page(watermark_page)
                 
                 writer.add_page(page)
+            
+            # Encrypt if password is provided
+            if password:
+                writer.encrypt(password)
+            
+            output_packet = io.BytesIO()
+            writer.write(output_packet)
+            pdf_bytes = output_packet.getvalue()
+        
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": 'attachment; filename="converted.pdf"'
+            }
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
 
             
             # Encrypt if password is provided
